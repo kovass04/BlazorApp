@@ -1,0 +1,110 @@
+﻿@page "/"
+@inject IConfiguration config
+@using Azure.Storage.Blobs
+@using BlazorApp1.Data
+
+<PageTitle>Upload Demo App</PageTitle>
+<div class="center">
+    <div class="card text-center m-auto" style="width: 40rem;">
+        <div class="card-body">
+            <h5 class="card-title">Upload</h5>
+            @if (errors.Count > 0)
+            {
+                @foreach(var error in errors)
+                {
+                    <h2 class="card-text">@error</h2>
+                }
+            }
+            <EditForm Model="newUpload" OnSubmit="SubmitForm">
+                <InputFile OnChange="@LoadFiles" class="form-control" multiple accept=".docx" />
+                <InputText type="email" id="inputEmail" class="form-control" placeholder="Email address" required="" @bind-Value="newUpload.Email" />
+                <button class="btn btn-primary mt-3 w-100" type="submit">Load</button>
+            </EditForm>
+        </div>
+    </div>
+</div>
+
+<style>
+    .center {
+        padding: 300px 0;
+        text-align: center;
+    }
+</style>
+
+
+
+
+
+@code {
+
+    private long maxFileSize = 1024 * 1024 * 3;
+    private int maxAllowedFiles = 1;
+    private List<string> errors = new();
+    private UploadModel newUpload = new();
+    private IBrowserFile? file;
+
+    private async Task SubmitForm()
+    {
+        try
+        {
+            errors.Clear();
+            string Email = newUpload.Email;
+            string path = await CaptureFile(Email);
+            if(path != ""){
+                errors.Add("Wait for an email notification.");
+            }
+
+        }
+        catch(Exception ex)
+        {
+            errors.Clear();
+            errors.Add($"Error: {ex.Message}");
+        }
+    }
+
+    private void LoadFiles(InputFileChangeEventArgs e)
+    {
+        file = e.File;		
+    }
+
+    private async Task<string> CaptureFile(string email)
+    {
+        if(file is null)
+        {
+            errors.Clear();
+            errors.Add("File is empty");
+            return "";
+        }
+
+        string extension = Path.GetExtension(file.Name);
+
+        if (extension != ".docx")
+        {
+            errors.Clear();
+            errors.Add("File does not have a format .docx");
+            return "";
+        }
+
+        try
+        {
+            var blobStorageConnectionString = "you connection string";
+
+            var blobStorageContainerName = "you conteiner name";
+
+            var container = new BlobContainerClient(blobStorageConnectionString, blobStorageContainerName);
+
+            string newFileName = $"{email}_{file.Name}";
+
+            var blob = container.GetBlobClient(newFileName);
+
+            await blob.UploadAsync(file.OpenReadStream(maxFileSize));
+            return file.Name;
+        }
+        catch (Exception ex)
+        {
+            errors.Clear();
+            errors.Add($"File: {file.Name} Error: {ex.Message}");
+            throw;
+        }  
+    }
+}
